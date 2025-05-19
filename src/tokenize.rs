@@ -52,8 +52,11 @@ impl Tokenizer {
                 self.step(1);
                 ret.push(Token::SubOpe);
                 continue;
-            } else if let Some(integer) = self.integer() {
-                ret.push(Token::Integer(integer));
+            } else if let Some(float_num) = self.float() {
+                ret.push(Token::Float(float_num));
+                continue;
+            } else if let Some(integer_num) = self.integer() {
+                ret.push(Token::Integer(integer_num));
                 continue;
             } else {
                 return Err(TokenizeErr {
@@ -99,7 +102,13 @@ impl Tokenizer {
         self.now_index += amount;
     }
 
-    /// tokenize integer
+    /// helper fn
+    fn back(&mut self, amount: usize) {
+        assert!(self.now_index - amount >= 0, "back method overflow! {} can't back; {:?}", amount, self);
+        self.now_index -= amount;
+    }
+
+    /// tokenize integer literal
     fn integer(&mut self) -> Option<i32> {
         let temp_index = self.now_index;
         while let Some('0'..='9') = self.next_char() {
@@ -110,12 +119,35 @@ impl Tokenizer {
             return None;
         }
         let integer: Result<i32, _>=  self.prev_str(number_length).unwrap().parse();
-
         match integer {
             Ok(value) => Some(value),
-            Err(_) => None
+            Err(_) => {
+                self.back(number_length);
+                None
+            }
         }
+    }
 
+    /// tokenize float literal
+    fn float(&mut self) -> Option<f32> {
+        let temp_index = self.now_index;
+        while let Some('0'..='9' | '.') = self.next_char() {
+            self.step(1);
+        }
+        let number_length = self.now_index - temp_index;
+        let target_str = self.prev_str(number_length).unwrap();
+        
+        match target_str.chars().filter(|i| *i == '.').count() {
+            0 => {
+                self.back(number_length);
+                None
+            },
+            1 => Some(target_str.parse().unwrap()),
+            2.. => {
+                self.back(number_length);
+                None
+            }
+        }
     }
 
 }
