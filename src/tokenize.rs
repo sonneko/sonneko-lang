@@ -6,12 +6,14 @@ pub enum Token {
     Float(f32),     // example: 9.8
     AddOpe,         // +
     SubOpe,         // -
+    MulOpe,         // *
+    DivOpe,         // /
 }
 
 #[derive(Debug, PartialEq)]
 pub enum TokenizeErrType {
     IllegalFloatLiteral,
-    Unknown
+    UnknownToken
 }
 
 #[derive(Debug)]
@@ -48,6 +50,14 @@ impl Tokenizer {
                 self.step(1);
                 ret.push(Token::AddOpe);
                 continue;
+            } else if self.is_starting_with("*") {
+                self.step(1);
+                ret.push(Token::MulOpe);
+                continue;
+            } else if self.is_starting_with("/") {
+                self.step(1);
+                ret.push(Token::DivOpe);
+                continue;
             } else if self.is_starting_with("-") {
                 self.step(1);
                 ret.push(Token::SubOpe);
@@ -61,7 +71,7 @@ impl Tokenizer {
             } else {
                 return Err(TokenizeErr {
                     location: self.now_index,
-                    err_type: TokenizeErrType::Unknown
+                    err_type: TokenizeErrType::UnknownToken
                 })
             }
         }
@@ -202,10 +212,19 @@ mod test {
     }
 
     #[test]
-    fn tokenize_complex_sub_and_add_expresson() {
+    fn tokenize_complex_sub_and_add_expresion() {
         test_tokenize(TestExample {
             source_code: "10 +.3- 3.8 22+2.".to_string(),
             expect_tokens: vec![Token::Integer(10), Token::AddOpe, Token::Float(0.3), Token::SubOpe, Token::Float(3.8), Token::Integer(22), Token::AddOpe, Token::Float(2.0)]
         });
     }
+
+    #[test]
+    fn tokenize_complex_sub_add_mul_div_expresion() {
+        test_tokenize(TestExample {
+            source_code: "10* .48 /3.2* 4. .5".to_string(),
+            expect_tokens: vec![Token::Integer(10), Token::MulOpe, Token::Float(0.48), Token::DivOpe, Token::Float(3.2), Token::MulOpe, Token::Float(4.0), Token::Float(0.5)]
+        });
+    }
+
 }
