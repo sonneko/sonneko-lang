@@ -61,6 +61,8 @@ impl Tokenizer {
             else if self.check_next("in") { self.push(Token::In) }
             else if self.check_next("let") { self.push(Token::Let) }
             else if self.check_next("return") { self.push(Token::Return) }
+            else if self.check_next("pub") { self.push(Token::Pub) }
+            else if self.check_next("namespace") { self.push(Token::NameSpace) }
             else if self.check_next("(") { self.push(Token::BrancketStart) }
             else if self.check_next(")") { self.push(Token::BrancketEnd) }
             else if self.check_next("[") { self.push(Token::SquareBracketStart) }
@@ -96,10 +98,10 @@ impl Tokenizer {
             self.now_index += 1;
         }
         match ret.iter().collect::<String>().parse::<i32>() {
-            Ok(interger) => self.push(Token::Integer(interger)),
+            Ok(interger) => self.push(Token::IntegerLiteral(interger)),
             Err(_) => {
                 match ret.into_iter().collect::<String>().parse::<f32>() {
-                    Ok(float) => self.push(Token::Float(float)),
+                    Ok(float) => self.push(Token::FloatLiteral(float)),
                     Err(_) => {
                         panic!("error in parse float literal");
                     }

@@ -20,6 +20,8 @@ pub enum Token {
     Fn,                    // fn keyword
     For,                   // for keyword
     In,                    // in keyword
+    Pub,                   // pub keyword
+    NameSpace,             // namespace keyword
     BrancketStart,         // (
     BrancketEnd,           // )
     CurlyBracketStart,     // {
@@ -33,10 +35,14 @@ pub enum Token {
     DivOpe,                // /
     GreaterOpe,            // <
     LesserOpe,             // >
-    Integer(i32),          // 20
-    Float(f32),            // 3.2
+    IntegerLiteral(i32),   // 20
+    FloatLiteral(f32),     // 3.2
     StringLiteral(String), // "string"
     True,                  // true
     False,                 // false
+    Int,                   // int type
+    Float,                 // float type
+    Char,                  // char type
+    Bool,                  // bool type
     EOF,                   // End of file
 }
