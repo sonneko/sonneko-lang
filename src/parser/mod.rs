@@ -1,5 +1,7 @@
 //! ```bnf
 //! @entry := <program>
+//! 
+//! # top level
 //! <program> := <declaration>*
 //! <declaration> := 
 //!     <static_variable_declaration>
@@ -13,179 +15,160 @@
 //! <function_declaration> := "pub"? <function_signature> "{" <statement>* "}"
 //! <class_declaration> := "pub"? "class" <IDENTIFIER> "{" ( <function_declaration> | <field_declaration> )* "}"
 //! <field_declaration> := "pub"? <IDENTIFIER> ":" <type_literal> ";"
-//! <trait_declaration> := "pub"? "trait" <IDENTIFIER> "{" ( ( <function_signature> ";" ) | <function_declaration> )* "}"
-//! <import_declaration> := "import" <IDENTIFIER> "from" <STRING_LITERAL> ";"
+//! <trait_declaration> := "pub"? "trait" <IDENTIFIER> "{" ( ( <function_signature> ) | <function_declaration> )* "}"
+//! <import_declaration> := "import" <IDENTIFIER> | ( "{" <IDENTIFIER>* "}" ) "from" <STRING_LITERAL> ";"
 //! 
-//! <type_literal> := "int" | "float" | "char" | "bool" | <IDENTIFY>  "<" <type_literal>* ">"
-//! <function_signature> := "fn" <IDENTIFIER> "(" ( <IDENTIFIER> ":" <type_literal> )* ")" ( ":" <type_literal> )?
-//! <identifier> := <IDENTIFIER> ( ( "." | "::" ) <identifier> )*
+//! # statement level
 //! <statement> := 
 //!     <expression> ";"
-//!   | ( "let" | "const" ) <IDENTIFIER> ( ":" <type_literal> )? ( "=" <expression> )? ";"
-//!   | <identifier> "=" <expression> ";"
-//!   | <identifier> "(" <expression>* ")" ";"
+//!   | ( "let" | "const" ) <pattern> ( ":" <type_literal> )? ( "=" <expression> )? ";"
+//!   | <accesser> "=" <expression> ";"
+//!   | <accesser> "(" ( <expression> "," )* <expression>? ")" ";"
+//!   | <for_statement>
+//!   | <while_statement>
+//! <for_statement> := "for" <pattern> "in" <expression> "{" <statement>* "}"
+//! <while_statement> := "while" <expression> "{" <statement>* "}"
+//! 
+//! # expression level
 //! <expression> := 
-//!     <unary_ope> <expression>
-//!   | <expression> <binary_ope> <expression>
+//!     <unary_result>
+//!   | <binary_result>
+//!   | <if_expression>
+//!   | <match_expression>
+//!   | <block_expression>
+//!   | <literal>
+//! <unary_result> := <unary_ope> <expression>
+//! <binary_result> := <expression> <binary_ope> <expression>
 //! <unary_ope> := "-"
 //! <binary_ope> := "+" | "-" | "/" | "*"
+//! <if_expression> := "if" <expression> <statement>* ( "else" <expression> )?
+//! <match_expression> := "match" <expression> "{" ( <pattern> "=>" <expression> "," )* "}"
+//! <block_expression> := "{" <statement>* "}"
+//! 
+//! # atomic level
+//! <type_literal> := "int" | "float" | "char" | "bool" | <IDENTIFY> ( "<" <type_literal>* ">" )? | "(" ( <type_literal> "," )* <type_literal>? ")"
+//! <function_signature> := "fn" <IDENTIFIER> "(" ( <pattern> ":" <type_literal> "," )* ( <pattern> ":" <type_literal> )? ")" ( ":" <type_literal> )?
+//! <accesser> := <IDENTIFIER> ( ( "." | "::" ) <accesser> )*
+//! <literal> := <STRING_LITERAL> | <INT_LITERAL> | <FLOAT_LITERAL> | <BOOL_LITERAL> | <struct_literal> | 
+//! 
+//! # pattern
+//! <pattern> := 
+//!     <literal-pattern>
+//!   | <identifier-pattern>
+//!   | <wildcard-pattern>
+//!   | <tuple-pattern>
+//!   | <struct-pattern>
+//!   | <enum-pattern>
+//!   | <reference-pattern>
+//!   | <slice-pattern>
+//!   | <range-pattern>
+//!   | <or-pattern>
+//! 
+//! <literal-pattern> := <literal>
+//! <identifier-pattern> := <IDENTIFIER>
+//! <wildcard-pattern> := "_"
+//! <tuple-pattern> := "(" ( <pattern> "," )* <pattern>? ")"
+//! <struct-pattern> := <accesser>
+//! <enum-pattern> := 
+//! <reference-pattern> := 
+//! <slice-pattern> := 
+//! <range-pattern> := 
+//! <or-pattern> := 
 //! ```
 
 pub mod parser;
+pub mod error;
 
-// 識別子（変数名、関数名など）
 type Identifier = String;
 
-// 型リテラル
-#[derive(Debug, PartialEq)]
-pub enum TypeLiteral {
-    Int,
-    Float,
-    Char,
-    Bool,
-    Custom(Identifier, Vec<TypeLiteral>),
+/// <program> := <declaration>*
+pub struct Program {
+    declarations: Vec<Declaration>,
 }
 
-// 演算子
-#[derive(Debug, PartialEq)]
-pub enum UnaryOp {
-    Minus,
-}
 
-#[derive(Debug, PartialEq)]
-pub enum BinaryOp {
-    Plus,
-    Minus,
-    Divide,
-    Multiply,
-}
-
-// 式
-#[derive(Debug, PartialEq)]
-pub enum Expression {
-    // 整数、浮動小数点数、文字、文字列、真偽値などのリテラル
-    Literal(Literal),
-    // 識別子（変数参照など）
-    Identifier(Identifier),
-    // 単項演算
-    UnaryOp(UnaryOp, Box<Expression>),
-    // 二項演算
-    BinaryOp(Box<Expression>, BinaryOp, Box<Expression>),
-    // 関数呼び出し
-    FunctionCall(Identifier, Vec<Expression>),
-}
-
-// リテラル
-#[derive(Debug, PartialEq)]
-pub enum Literal {
-    Integer(i64),
-    Float(f64),
-    Char(char),
-    Bool(bool),
-    String(String),
-}
-
-// 文
-#[derive(Debug, PartialEq)]
-pub enum Statement {
-    Expression(Expression),
-    // 変数宣言: let/const name: Type = expr;
-    VariableDeclaration {
-        is_const: bool,
-        name: Identifier,
-        type_hint: Option<TypeLiteral>,
-        initializer: Option<Expression>,
-    },
-    // 代入: name = expr;
-    Assignment {
-        target: Identifier,
-        value: Expression,
-    },
-    // 関数呼び出し文: name(args);
-    FunctionCall(Identifier, Vec<Expression>),
-}
-
-// 関数シグネチャ
-#[derive(Debug, PartialEq)]
-pub struct FunctionSignature {
-    pub name: Identifier,
-    pub params: Vec<(Identifier, TypeLiteral)>,
-    pub return_type: Option<TypeLiteral>,
-}
-
-// 宣言
-#[derive(Debug, PartialEq)]
+/// <declaration> := 
+///     <static_variable_declaration>
+///   | <namespace_declaration>
+///   | <function_declaration>
+///   | <class_declaration>
+///   | <trait_declaration>
+///   | <import_declaration>
 pub enum Declaration {
-    StaticVariable {
-        is_pub: bool,
-        name: Identifier,
-        type_hint: TypeLiteral,
-        initializer: Expression,
-    },
-    Namespace {
-        is_pub: bool,
-        name: Identifier,
-        body: Program,
-    },
+    StaticVariable(StaticVariableDeclaration),
+    Namespace(NamespaceDeclaration),
     Function(FunctionDeclaration),
     Class(ClassDeclaration),
     Trait(TraitDeclaration),
-    Import {
-        module: Identifier,
-        from: String,
-    },
+    Import(ImportDeclaration),
 }
 
-// 関数宣言
-#[derive(Debug, PartialEq)]
-pub struct FunctionDeclaration {
-    pub is_pub: bool,
-    pub signature: FunctionSignature,
-    pub body: Vec<Statement>,
+/// <static_variable_declaration> := "pub"? "static" <IDENTIFIER> ":" <type_literal> "=" <expression> ";"
+struct StaticVariableDeclaration {
+    is_pub: bool,
+    name: Identifier,
+    type_annotation: Option<TypeLiteral>,
+    value: Expression,
 }
 
-// フィールド宣言（クラス内）
-#[derive(Debug, PartialEq)]
+/// <namespace_declaration> := "pub"? "namespace" <IDENTIFIER> "{" <program> "}"
+struct NamespaceDeclaration {
+    name: Identifier,
+    inner: Program,
+}
+
+/// <function_declaration> := "pub"? <function_signature> "{" <statement>* "}"
+struct FunctionDeclaration {
+    is_pub: bool,
+    name: Identifier,
+    signature: FunctionSignature,
+    inner: Vec<Statement>
+}
+
+/// <class_declaration> := "pub"? "class" <IDENTIFIER> "{" ( <function_declaration> | <field_declaration> )* "}"
+struct ClassDeclaration {
+    is_pub: bool,
+    fields: Vec<FieldDeclaration>,
+    methods: Vec<FunctionDeclaration>,
+}
+
+/// <field_declaration> := "pub"? <IDENTIFIER> ":" <type_literal> ";"
 pub struct FieldDeclaration {
-    pub is_pub: bool,
-    pub name: Identifier,
-    pub type_hint: TypeLiteral,
+    is_pub: bool,
+    name: Identifier,
+    type_annotation: TypeLiteral,
 }
 
-// クラス宣言
-#[derive(Debug, PartialEq)]
-pub struct ClassDeclaration {
-    pub is_pub: bool,
-    pub name: Identifier,
-    // 関数またはフィールドの宣言のリスト
-    pub members: Vec<ClassMember>,
+/// <trait_declaration> := "pub"? "trait" <IDENTIFIER> "{" ( ( <function_signature> ) | <function_declaration> )* "}"
+struct TraitDeclaration {
+    is_pub: bool,
+    signatures: Vec<FunctionSignature>,
+    functions: Vec<FunctionDeclaration>,
 }
 
-// クラスのメンバ
-#[derive(Debug, PartialEq)]
-pub enum ClassMember {
-    Function(FunctionDeclaration),
-    Field(FieldDeclaration),
+/// <import_declaration> := "import" <IDENTIFIER> "from" <STRING_LITERAL> ";"
+struct ImportDeclaration {
+    name: Identifier,
+    path: String,
 }
 
-// トレイト宣言
-#[derive(Debug, PartialEq)]
-pub struct TraitDeclaration {
-    pub is_pub: bool,
-    pub name: Identifier,
-    // 関数シグネチャまたは関数宣言のリスト
-    pub methods: Vec<TraitMethod>,
+/// <type_literal> := "int" | "float" | "char" | "bool" | <IDENTIFY> ( "<" <type_literal>* ">" )? | "(" ( <type_literal> "," )* <type_literal>? ")"
+pub enum TypeLiteral {
+    IntType,
+    FloatType,
+    CharType,
+    BoolType,
+    CustomType {
+        name: Identifier,
+        type_args: Vec<TypeLiteral>,
+    },
+    TupleType {
+        inner: Vec<TypeLiteral>,
+    }
 }
 
-// トレイトのメソッド
-#[derive(Debug, PartialEq)]
-pub enum TraitMethod {
-    Signature(FunctionSignature),
-    Definition(FunctionDeclaration),
-}
+pub struct Expression;
 
-// プログラム全体
-#[derive(Debug, PartialEq)]
-pub struct Program {
-    pub declarations: Vec<Declaration>,
-}
+/// <function_signature> := "fn" <IDENTIFIER> "(" ( <pattern> ":" <type_literal> "," )* ( <pattern> ":" <type_literal> )? ")" ( ":" <type_literal> )?
+pub struct FunctionSignature;
+pub struct Statement;
